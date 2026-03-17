@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>豚匠 TUN JIANG | 重新定義市場職人肉品</title>
+    
+    <!-- Fonts: Noto Serif TC (Serif) for headings, Inter for UI text -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Noto+Serif+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['"Noto Serif TC"', 'serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#0a0a0a',
+                            light: '#f4f0ec',
+                            accent: '#8b1818', // Deep meat red
+                            gray: '#1f1f1f'
+                        }
+                    },
+                    backgroundImage: {
+                        'noise': "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')",
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Iconify -->
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+
+    <!-- GSAP & Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #f4f0ec;
+            overflow-x: hidden;
+            cursor: none; /* Hide default cursor for custom cursor */
+        }
+
+        /* Custom Cursor */
+        #cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #f4f0ec;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+            transition: width 0.3s, height 0.3s, background-color 0.3s;
+            will-change: transform;
+        }
+        #cursor.hover-active {
+            width: 60px;
+            height: 60px;
+            background-color: #8b1818;
+        }
+
+        /* WebGL Background */
+        #webgl-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -2;
+            pointer-events: none;
+        }
+
+        /* Global Noise Overlay */
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.04;
+            background-image: url('data:image/svg+xml,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+        }
+
+        /* Vertical Container Reference Lines */
+        .guide-lines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 5vw;
+        }
+        .guide-line {
+            width: 1px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Hide Scrollbar but keep functionality */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 10px;
+        }
+
+        /* Clip Path Utilities */
+        .clip-polygon {
+            clip-path: polygon(0 100%, 100% 100%, 100% 100%, 0 100%);
+        }
+        
+        .text-reveal-wrapper {
+            overflow: hidden;
+            display: inline-block;
+        }
+        
+        /* Magnetic Button */
+        .magnetic-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-brand-accent selection:text-white">
+
+    <!-- WebGL & Noise Background -->
+    <canvas id="webgl-canvas"></canvas>
+    <div class="noise-overlay"></div>
+
+    <!-- Custom Cursor -->
+    <div id="cursor"></div>
+
+    <!-- Vertical Guides -->
+    <div class="guide-lines hidden md:flex">
+        <div class="guide-line"></div>
+        <div class="guide-line"></div>
+        <div class="guide-line"></div>
+        <div class="guide-line"></div>
+        <div class="guide-line"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 w-full z-50 px-6 py-6 mix-blend-difference flex justify-between items-center text-brand-light">
+        <div class="text-xl font-serif tracking-widest font-bold">豚匠<span class="text-xs font-sans tracking-normal ml-2 opacity-50">TUN JIANG</span></div>
+        <div class="hidden md:flex gap-8 text-sm tracking-widest uppercase">
+            <a href="#about" class="hover-trigger relative after:content-[''] after:absolute after:-bottom-1 after:left-0 after:w-0 after:h-[1px] after:bg-brand-light after:transition-all hover:after:w-full">理念</a>
+            <a href="#dishes" class="hover-trigger relative after:content-[''] after:absolute after:-bottom-1 after:left-0 after:w-0 after:h-[1px] after:bg-brand-light after:transition-all hover:after:w-full">料理</a>
+            <a href="#contact" class="hover-trigger relative after:content-[''] after:absolute after:-bottom-1 after:left-0 after:w-0 after:h-[1px] after:bg-brand-light after:transition-all hover:after:w-full">預約</a>
+        </div>
+        <button class="md:hidden hover-trigger">
+            <iconify-icon icon="lucide:menu" width="24"></iconify-icon>
+        </button>
+    </nav>
+
+    <!-- Hero Section with 4-Column Clip -->
+    <section class="relative w-full h-screen flex items-center justify-center overflow-hidden z-10">
+        <!-- 4-Column Background Wrap -->
+        <div class="absolute inset-0 flex w-full h-full z-0 pointer-events-none" id="hero-columns">
+            <div class="w-1/4 h-full bg-cover bg-center border-r border-white/5 clip-polygon hero-col" style="background-image: url('https://images.unsplash.com/photo-1607006411005-bf81912a7a50?q=80&w=1000&auto=format&fit=crop');"></div>
+            <div class="w-1/4 h-full bg-cover bg-center border-r border-white/5 clip-polygon hero-col" style="background-image: url('https://images.unsplash.com/photo-1598514982205-f36b96d1e8d4?q=80&w=1000&auto=format&fit=crop');"></div>
+            <div class="w-1/4 h-full bg-cover bg-center border-r border-white/5 clip-polygon hero-col" style="background-image: url('https://images.unsplash.com/photo-1627308595229-7830f5c92f31?q=80&w=1000&auto=format&fit=crop');"></div>
+            <div class="w-1/4 h-full bg-cover bg-center clip-polygon hero-col" style="background-image: url('https://images.unsplash.com/photo-1551028150-64b9e398f678?q=80&w=1000&auto=format&fit=crop');"></div>
+        </div>
+        
+        <!-- Dark overlay to make text pop -->
+        <div class="absolute inset-0 bg-brand-dark/60 z-10 hero-overlay opacity-0"></div>
+
+        <div class="relative z-20 text-center px-4 mix-blend-lighten">
+            <div class="mb-4 overflow-hidden">
+                <p class="text-sm md:text-base tracking-[0.3em] text-brand-accent uppercase hero-text-anim translate-y-full">Artisan Pork Market</p>
+            </div>
+            <h1 class="font-serif text-5xl md:text-8xl lg:text-9xl font-bold tracking-tight mb-8 leading-tight">
+                <span class="text-reveal-wrapper"><span class="block hero-title-anim translate-y-[120%]">重新定義</span></span><br>
+                <span class="text-reveal-wrapper"><span class="block hero-title-anim translate-y-[120%]">市場職人肉品</span></span>
+            </h1>
+            <div class="overflow-hidden mt-8">
+                <a href="#dishes" class="magnetic-btn group inline-flex items-center gap-3 border border-brand-light/30 rounded-full px-8 py-4 hover:bg-brand-light hover:text-brand-dark transition-colors duration-500 hero-btn-anim translate-y-full hover-trigger">
+                    <span class="tracking-widest text-sm">探索極致肉品</span>
+                    <iconify-icon icon="lucide:arrow-down-right" class="group-hover:rotate-45 transition-transform duration-500"></iconify-icon>
+                </a>
+            </div>
+        </div>
+
+        <!-- Scroll Indicator -->
+        <div class="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 opacity-50">
+            <span class="text-xs tracking-widest writing-vertical-rl rotate-180">SCROLL</span>
+            <div class="w-[1px] h-12 bg-gradient-to-b from-brand-light to-transparent"></div>
+        </div>
+    </section>
+
+    <!-- Core Values Section (Staggered Scroll) -->
+    <section id="about" class="relative w-full py-32 md:py-48 px-6 md:px-12 z-10 bg-brand-dark/90 backdrop-blur-sm">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-24">
+                <h2 class="font-serif text-4xl md:text-6xl max-w-2xl leading-tight">
+                    <span class="text-brand-accent">顛覆傳統</span><br>
+                    堅持極致純粹的<br>職人精神。
+                </h2>
+                <p class="text-brand-light/60 max-w-md mt-8 md:mt-0 text-sm leading-relaxed tracking-wider font-light">
+                    從產地到餐桌，豚匠打破傳統市場的擁擠與氣味。以明亮乾淨的現代化空間、每日清晨產地直送的頂級鮮肉，與精準的部位分切工藝，為您的日常餐桌帶來安心與質感的完美體驗。
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-12 border-t border-brand-light/10 pt-16">
+                <!-- Value 1 -->
+                <div class="value-card opacity-0 translate-y-10">
+                    <div class="text-4xl text-brand-light/20 font-serif mb-6">01</div>
+                    <h3 class="text-xl font-serif mb-4 tracking-wider">極致鮮切工藝</h3>
+                    <p class="text-sm text-brand-light/60 leading-relaxed font-light">每日清晨產地直送，由具備數十年經驗的職人親自操刀。依照肌肉紋理精準分切，確保每一口肉質的軟嫩與鮮甜。</p>
+                </div>
+                <!-- Value 2 -->
+                <div class="value-card opacity-0 translate-y-10 md:mt-12">
+                    <div class="text-4xl text-brand-light/20 font-serif mb-6">02</div>
+                    <h3 class="text-xl font-serif mb-4 tracking-wider">純粹質感空間</h3>
+                    <p class="text-sm text-brand-light/60 leading-relaxed font-light">告別傳統市場的刻板印象。以低溫無塵概念打造明亮衛生的展售空間，無腥味環境讓挑選食材成為一種享受。</p>
+                </div>
+                <!-- Value 3 -->
+                <div class="value-card opacity-0 translate-y-10 md:mt-24">
+                    <div class="text-4xl text-brand-light/20 font-serif mb-6">03</div>
+                    <h3 class="text-xl font-serif mb-4 tracking-wider">在地人情顧問</h3>
+                    <p class="text-sm text-brand-light/60 leading-relaxed font-light">保留最珍貴的傳統人情味。我們不僅販售肉品，更是您的專屬料理顧問，針對不同菜色推薦最完美的部位與烹飪建議。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6 Pork Dishes (Parallax & Reveal) -->
+    <section id="dishes" class="relative w-full py-32 z-10 bg-brand-dark">
+        <div class="max-w-7xl mx-auto px-6 md:px-12 mb-20 text-center">
+            <span class="text-brand-accent tracking-[0.2em] text-sm mb-4 block">SIGNATURE DISHES</span>
+            <h2 class="font-serif text-4xl md:text-6xl">餐桌上的藝術品</h2>
+        </div>
+
+        <div class="flex flex-col gap-32 md:gap-48 mt-24">
+            
+            <!-- Dish 1 -->
+            <div class="dish-row relative flex flex-col md:flex-row items-center gap-12 px-6 md:px-12">
+                <div class="w-full md:w-1/2 aspect-[4/5] overflow-hidden rounded-2xl">
+                    <img src="https://raw.githubusercontent.com/dittehyl/pot/main/unnamed%20(5).jpg" alt="慢燉紅燒肉" class="w-full h-full object-cover dish-img scale-125">
+                </div>
+                <div class="w-full md:w-1/2 md:pl-12">
+                    <div class="text-5xl text-brand-light/10 font-serif absolute -top-10 left-0 md:relative md:top-0 md:left-0 mb-4">I.</div>
+                    <h3 class="text-3xl md:text-4xl font-serif mb-6 dish-title">慢燉紅燒肉</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">嚴選食材</h4>
+                            <p class="text-sm text-brand-light/70 font-light">頂級帶皮五花肉、古法冰糖、嚴選八角、陳年老抽</p>
+                        </div>
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">職人料理過程</h4>
+                            <p class="text-sm text-brand-light/70 font-light leading-relaxed">
+                                將肥瘦相間的完美五花肉入鍋煎香逼出多餘油脂，加入冰糖炒出焦糖琥珀色。隨後注入老抽與香料，以細火慢燉兩小時。精準的火候控制使膠質完全釋放，達成肥而不膩、入口即化的極致口感。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dish 2 -->
+            <div class="dish-row relative flex flex-col md:flex-row-reverse items-center gap-12 px-6 md:px-12">
+                <div class="w-full md:w-1/2 aspect-[4/5] overflow-hidden rounded-2xl">
+                    <img src="https://raw.githubusercontent.com/dittehyl/pot/main/unnamed%20(1).jpg" alt="蒜泥白肉" class="w-full h-full object-cover dish-img scale-125">
+                </div>
+                <div class="w-full md:w-1/2 md:pr-12">
+                    <div class="text-5xl text-brand-light/10 font-serif absolute -top-10 right-0 md:relative md:top-0 md:left-0 mb-4">II.</div>
+                    <h3 class="text-3xl md:text-4xl font-serif mb-6 dish-title">蒜泥白肉</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">嚴選食材</h4>
+                            <p class="text-sm text-brand-light/70 font-light">新鮮帶皮豬五花中段、在地鮮採蒜頭、手工醬油膏、頂級香油</p>
+                        </div>
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">職人料理過程</h4>
+                            <p class="text-sm text-brand-light/70 font-light leading-relaxed">
+                                取豬五花最精華的中段，以滾水輔以蔥薑白煮去腥。冷卻後施以極致刀工切成透光薄片。淋上以新鮮蒜泥、特調醬油膏與純白芝麻香油依黃金比例調製的秘製醬汁，清爽彈牙，蒜香四溢。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dish 3 -->
+            <div class="dish-row relative flex flex-col md:flex-row items-center gap-12 px-6 md:px-12">
+                <div class="w-full md:w-1/2 aspect-[4/5] overflow-hidden rounded-2xl">
+                    <img src="https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1000&auto=format&fit=crop" alt="酥炸松阪肉" class="w-full h-full object-cover dish-img scale-125">
+                </div>
+                <div class="w-full md:w-1/2 md:pl-12">
+                    <div class="text-5xl text-brand-light/10 font-serif absolute -top-10 left-0 md:relative md:top-0 md:left-0 mb-4">III.</div>
+                    <h3 class="text-3xl md:text-4xl font-serif mb-6 dish-title">酥炸松阪肉</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">嚴選食材</h4>
+                            <p class="text-sm text-brand-light/70 font-light">珍稀豬頸肉 (黃金六兩)、純手工地瓜粉、秘方五香粉、白胡椒</p>
+                        </div>
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">職人料理過程</h4>
+                            <p class="text-sm text-brand-light/70 font-light leading-relaxed">
+                                選取一頭豬僅有兩百公克的珍貴頸肉，以獨家漢方香料短暫醃製入味。均勻裹上顆粒感十足的地瓜粉後，投入高溫熱油中快炸三十秒封鎖肉汁。起鍋切片，外層酥脆無比，內裡肉質脆彈多汁。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dish 4 -->
+            <div class="dish-row relative flex flex-col md:flex-row-reverse items-center gap-12 px-6 md:px-12">
+                <div class="w-full md:w-1/2 aspect-[4/5] overflow-hidden rounded-2xl">
+                    <img src="https://raw.githubusercontent.com/dittehyl/pot/main/unnamed.jpg" alt="炭烤豬肋排" class="w-full h-full object-cover dish-img scale-125"> <!-- Used a meaty alternative Unsplash image -->
+                </div>
+                <div class="w-full md:w-1/2 md:pr-12">
+                    <div class="text-5xl text-brand-light/10 font-serif absolute -top-10 right-0 md:relative md:top-0 md:left-0 mb-4">IV.</div>
+                    <h3 class="text-3xl md:text-4xl font-serif mb-6 dish-title">炭烤豬肋排</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">嚴選食材</h4>
+                            <p class="text-sm text-brand-light/70 font-light">精選豬肋排、龍眼蜂蜜、自製煙燻烤肉醬、海鹽</p>
+                        </div>
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">職人料理過程</h4>
+                            <p class="text-sm text-brand-light/70 font-light leading-relaxed">
+                                採用現代舒肥技術低溫烹調數小時，確保肋排肉質達到骨肉分離的極致柔嫩。出餐前刷上特製煙燻醬與龍眼蜂蜜，置於高溫炭火上快烤。火焰與油脂交織，表面形成誘人的焦糖化微脆外皮。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dish 5 -->
+            <div class="dish-row relative flex flex-col md:flex-row items-center gap-12 px-6 md:px-12">
+                <div class="w-full md:w-1/2 aspect-[4/5] overflow-hidden rounded-2xl">
+                    <img src="https://raw.githubusercontent.com/dittehyl/pot/main/%E9%9D%92%E6%A2%85%E6%B6%AE%E7%99%BD%E8%82%89.jpg" alt="青梅涮白肉" class="w-full h-full object-cover dish-img scale-125">
+                </div>
+                <div class="w-full md:w-1/2 md:pl-12">
+                    <div class="text-5xl text-brand-light/10 font-serif absolute -top-10 left-0 md:relative md:top-0 md:left-0 mb-4">V.</div>
+                    <h3 class="text-3xl md:text-4xl font-serif mb-6 dish-title">青梅涮白肉</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">嚴選食材</h4>
+                            <p class="text-sm text-brand-light/70 font-light">頂級梅花豬肉片、陳年青梅汁、柴魚昆布高湯、季節時蔬</p>
+                        </div>
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">職人料理過程</h4>
+                            <p class="text-sm text-brand-light/70 font-light leading-relaxed">
+                                將油脂分佈如大理石般均勻的梅花肉，以精準溫控機切成 2mm 極薄片。放入微滾的清透柴魚昆布高湯中輕涮三秒，肉片呈現粉嫩色澤時撈起。佐以特調酸甜青梅沾醬，解膩且帶出豬肉最純粹的甘甜。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dish 6 -->
+            <div class="dish-row relative flex flex-col md:flex-row-reverse items-center gap-12 px-6 md:px-12">
+                <div class="w-full md:w-1/2 aspect-[4/5] overflow-hidden rounded-2xl">
+                    <img src="https://chatgpt.com/backend-api/estuary/content?id=file_00000000326471f8a2d670900584893b&cp=pri&ma=90000&ts=20529&p=igh&cid=1&sig=afc1d29861e195b1983d2997163fda581276e9cf1a12a580d7a4457c5855031c" alt="香煎戰斧豬排" class="w-full h-full object-cover dish-img scale-125">
+                </div>
+                <div class="w-full md:w-1/2 md:pr-12">
+                    <div class="text-5xl text-brand-light/10 font-serif absolute -top-10 right-0 md:relative md:top-0 md:left-0 mb-4">VI.</div>
+                    <h3 class="text-3xl md:text-4xl font-serif mb-6 dish-title">香煎戰斧豬排</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">嚴選食材</h4>
+                            <p class="text-sm text-brand-light/70 font-light">厚切戰斧豬排、頂級海鹽、新鮮迷迭香、發酵無鹽奶油</p>
+                        </div>
+                        <div>
+                            <h4 class="text-xs tracking-[0.2em] text-brand-accent mb-2">職人料理過程</h4>
+                            <p class="text-sm text-brand-light/70 font-light leading-relaxed">
+                                豪邁的帶骨戰斧排，僅以海鹽與黑胡椒簡單調味。使用厚底鐵鍋大火將兩面煎至焦黃上色，加入新鮮迷迭香與大蒜。最後投入奶油，以油淋法反覆澆淋表面烤熟，靜置五分鐘鎖住豐沛肉汁，展現粗獷與細膩的完美結合。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Partners / Quality Assurance -->
+    <section class="py-24 border-t border-brand-light/10 bg-brand-dark relative z-10">
+        <div class="max-w-7xl mx-auto px-6 text-center">
+            <p class="text-xs tracking-[0.3em] text-brand-light/40 mb-12 uppercase">頂尖餐廳指定合作肉品</p>
+            <div class="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-50 grayscale hover:grayscale-0 transition-all duration-700">
+                <iconify-icon icon="simple-icons:michelin" width="48" class="hover-trigger"></iconify-icon>
+                <iconify-icon icon="simple-icons:ubereats" width="48" class="hover-trigger"></iconify-icon>
+                <iconify-icon icon="simple-icons:foodpanda" width="48" class="hover-trigger"></iconify-icon>
+                <iconify-icon icon="simple-icons:tripadvisor" width="48" class="hover-trigger"></iconify-icon>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA & Footer -->
+    <footer id="contact" class="relative py-32 bg-brand-dark z-10 overflow-hidden">
+        <div class="absolute inset-0 bg-brand-accent/5 pointer-events-none"></div>
+        <div class="max-w-7xl mx-auto px-6 text-center relative z-10">
+            <h2 class="font-serif text-5xl md:text-7xl mb-10">將極致質感，<br>帶回您的餐桌。</h2>
+            <p class="text-brand-light/60 mb-12 max-w-md mx-auto font-light">豚匠為您提供客製化切肉服務與料理建議。歡迎預約專屬時段，體驗不一樣的傳統市場採購。</p>
+            <a href="#" class="magnetic-btn group inline-flex items-center gap-3 bg-brand-light text-brand-dark rounded-full px-10 py-5 hover:bg-brand-accent hover:text-brand-light transition-colors duration-500 hover-trigger">
+                <span class="tracking-widest font-medium">預約專屬部位</span>
+                <iconify-icon icon="lucide:arrow-right" class="group-hover:translate-x-2 transition-transform duration-500"></iconify-icon>
+            </a>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-6 mt-32 flex flex-col md:flex-row justify-between items-center text-xs text-brand-light/30 tracking-wider">
+            <p>&copy; 2026 TUN JIANG ARTISAN PORK. ALL RIGHTS RESERVED.</p>
+            <div class="flex gap-6 mt-4 md:mt-0">
+                <a href="#" class="hover:text-brand-light transition-colors">INSTAGRAM</a>
+                <a href="#" class="hover:text-brand-light transition-colors">FACEBOOK</a>
+                <a href="#" class="hover:text-brand-light transition-colors">LINE OFFICIAL</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- GSAP & Interaction Scripts -->
+    <script>
+        // Ensure DOM is fully loaded
+        document.addEventListener("DOMContentLoaded", (event) => {
+            
+            // 1. Custom Cursor Implementation (with mix-blend-mode)
+            const cursor = document.getElementById('cursor');
+            const hoverTriggers = document.querySelectorAll('.hover-trigger, a, button');
+
+            document.addEventListener('mousemove', (e) => {
+                gsap.to(cursor, {
+                    x: e.clientX,
+                    y: e.clientY,
+                    duration: 0.1,
+                    ease: "power2.out"
+                });
+            });
+
+            hoverTriggers.forEach(trigger => {
+                trigger.addEventListener('mouseenter', () => cursor.classList.add('hover-active'));
+                trigger.addEventListener('mouseleave', () => cursor.classList.remove('hover-active'));
+            });
+
+            // 2. Magnetic Buttons
+            const magneticBtns = document.querySelectorAll('.magnetic-btn');
+            magneticBtns.forEach(btn => {
+                btn.addEventListener('mousemove', function(e) {
+                    const position = btn.getBoundingClientRect();
+                    const x = e.pageX - position.left - position.width / 2;
+                    const y = e.pageY - position.top - position.height / 2;
+                    
+                    gsap.to(btn, {
+                        x: x * 0.3,
+                        y: y * 0.5,
+                        duration: 0.5,
+                        ease: "power3.out"
+                    });
+                });
+                btn.addEventListener('mouseleave', function() {
+                    gsap.to(btn, {
+                        x: 0,
+                        y: 0,
+                        duration: 0.5,
+                        ease: "elastic.out(1, 0.3)"
+                    });
+                });
+            });
+
+            // 3. GSAP Animations Setup
+            gsap.registerPlugin(ScrollTrigger);
+
+            // Hero Entrance Animation
+            const heroTimeline = gsap.timeline();
+            
+            // 4-Column Clip Reveal
+            heroTimeline.to('.hero-col', {
+                clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)',
+                duration: 1.5,
+                stagger: 0.1,
+                ease: 'power4.inOut'
+            })
+            .to('.hero-overlay', {
+                opacity: 1,
+                duration: 1,
+                ease: 'power2.out'
+            }, "-=0.8")
+            .to('.hero-text-anim', {
+                y: 0,
+                duration: 1,
+                ease: 'power3.out'
+            }, "-=0.5")
+            .to('.hero-title-anim', {
+                y: 0,
+                duration: 1,
+                stagger: 0.1,
+                ease: 'power4.out'
+            }, "-=0.8")
+            .to('.hero-btn-anim', {
+                y: 0,
+                duration: 1,
+                ease: 'power3.out'
+            }, "-=0.6");
+
+            // About Section Stagger Reveal
+            gsap.to('.value-card', {
+                scrollTrigger: {
+                    trigger: '#about',
+                    start: 'top 70%',
+                },
+                y: 0,
+                opacity: 1,
+                duration: 1,
+                stagger: 0.2,
+                ease: 'power3.out'
+            });
+
+            // Dishes Parallax & Reveal
+            const dishRows = document.querySelectorAll('.dish-row');
+            dishRows.forEach((row, index) => {
+                const img = row.querySelector('.dish-img');
+                const title = row.querySelector('.dish-title');
+                const textElements = row.querySelectorAll('p, h4');
+
+                // Image Parallax
+                gsap.to(img, {
+                    scrollTrigger: {
+                        trigger: row,
+                        start: 'top bottom',
+                        end: 'bottom top',
+                        scrub: 1
+                    },
+                    scale: 1, // scales down from 1.25 to 1
+                    y: '10%',
+                    ease: 'none'
+                });
+
+                // Content Reveal
+                gsap.from([title, ...textElements], {
+                    scrollTrigger: {
+                        trigger: row,
+                        start: 'top 80%',
+                    },
+                    y: 30,
+                    opacity: 0,
+                    duration: 1,
+                    stagger: 0.1,
+                    ease: 'power3.out'
+                });
+            });
+
+            // 4. WebGL Background Setup (Three.js)
+            initWebGL();
+        });
+
+        // WebGL High-End Fluid Noise Background
+        function initWebGL() {
+            const canvas = document.getElementById('webgl-canvas');
+            const scene = new THREE.Scene();
+            
+            // Orthographic camera for full screen 2D effect
+            const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+            
+            const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // optimize performance
+
+            // Custom Fragment Shader for premium dark fluid noise
+            const vertexShader = `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = vec4(position, 1.0);
+                }
+            `;
+
+            const fragmentShader = `
+                uniform float u_time;
+                uniform vec2 u_resolution;
+                varying vec2 vUv;
+
+                // Simplex 2D noise
+                vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+                float snoise(vec2 v){
+                    const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+                    vec2 i  = floor(v + dot(v, C.yy) );
+                    vec2 x0 = v -   i + dot(i, C.xx);
+                    vec2 i1;
+                    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+                    vec4 x12 = x0.xyxy + C.xxzz;
+                    x12.xy -= i1;
+                    i = mod(i, 289.0);
+                    vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
+                    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+                    m = m*m ;
+                    m = m*m ;
+                    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+                    vec3 h = abs(x) - 0.5;
+                    vec3 ox = floor(x + 0.5);
+                    vec3 a0 = x - ox;
+                    m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+                    vec3 g;
+                    g.x  = a0.x  * x0.x  + h.x  * x0.y;
+                    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+                    return 130.0 * dot(m, g);
+                }
+
+                void main() {
+                    vec2 st = gl_FragCoord.xy/u_resolution.xy;
+                    st.x *= u_resolution.x/u_resolution.y;
+
+                    // Create slow fluid motion
+                    vec2 pos = vec2(st * 1.5);
+                    float n = snoise(pos + u_time * 0.05);
+                    float n2 = snoise(pos + n * 2.0 - u_time * 0.08);
+                    
+                    // Dark luxury colors (Charcoal base, subtle crimson hints)
+                    vec3 color1 = vec3(0.03, 0.03, 0.03); // Deep dark
+                    vec3 color2 = vec3(0.12, 0.05, 0.05); // Dark reddish
+                    vec3 color3 = vec3(0.05, 0.05, 0.05); // Dark gray
+                    
+                    float mixValue = smoothstep(-1.0, 1.0, n2);
+                    vec3 finalColor = mix(color1, color2, mixValue * 0.5);
+                    finalColor = mix(finalColor, color3, snoise(pos * 3.0 + u_time * 0.02) * 0.5 + 0.5);
+
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `;
+
+            const uniforms = {
+                u_time: { value: 0.0 },
+                u_resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+            };
+
+            const material = new THREE.ShaderMaterial({
+                vertexShader: vertexShader,
+                fragmentShader: fragmentShader,
+                uniforms: uniforms
+            });
+
+            const geometry = new THREE.PlaneGeometry(2, 2);
+            const mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+
+            // Animation Loop
+            let time = 0;
+            function animate() {
+                requestAnimationFrame(animate);
+                time += 0.01;
+                uniforms.u_time.value = time;
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            // Handle Resize
+            window.addEventListener('resize', () => {
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+            });
+        }
+    </script>
+</body>
+</html>
